@@ -1,4 +1,4 @@
-# Odoo 18 - Instalação Automatizada e Localização Brasileira (OCA) 🇧🇷
+# 🇧🇷 Odoo 18 - Instalação Automatizada e Localização Brasileira (OCA)
 
 Este repositório fornece ferramentas e documentação completas para a instalação e configuração de um ambiente Odoo 18 (Community) adaptado para o Brasil em servidores rodando **Ubuntu 24.04 LTS**.
 
