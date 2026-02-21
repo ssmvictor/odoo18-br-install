@@ -1,98 +1,63 @@
-# 🇧🇷 odoo18-br-install
+# Odoo 18 - Instalação Automatizada e Localização Brasileira (OCA) 🇧🇷
 
-Scripts e guia completo para instalação automatizada do **Odoo 18** com **Localização Brasileira (OCA)** em servidores Ubuntu 24.04 LTS.
+Este repositório fornece ferramentas e documentação completas para a instalação e configuração de um ambiente Odoo 18 (Community) adaptado para o Brasil em servidores rodando **Ubuntu 24.04 LTS**.
 
----
+Todo o processo foi desenhado para facilitar o deploy limpo das bibliotecas e dependências da [OCA (Odoo Community Association)](https://github.com/OCA/l10n-brazil) necessárias para a localização brasileira (emissão de notas fiscais, integração bancária, etc).
 
-## 📦 Arquivos do Repositório
+## � Estrutura do Repositório
 
-| Arquivo | Descrição |
-|---|---|
-| `instalar_odoo18_brasil.sh` | Script de instalação completa do zero (Odoo 18 + OCA Brasil) |
-| `backup_restore_odoo.sh` | Script de backup e restauração do banco PostgreSQL + filestore |
-| `Guia_Instalacao_Odoo18_LocalizacaoBR.md` | Guia passo a passo detalhado para instalação manual e configuração |
+```text
+odoo18-br-install/
+├── README.md
+├── docs/
+│   └── Guia_Instalacao_Odoo18_LocalizacaoBR.md
+└── scripts/
+    ├── instalar_odoo18_brasil.sh
+    └── backup_restore_odoo.sh
+```
 
----
+- 📄 `docs/Guia_Instalacao_Odoo18_LocalizacaoBR.md`: Documentação técnica detalhada, explicando passo a passo o que cada comando faz, desde os requisitos do servidor até a instalação e configuração dos módulos via painel do Odoo.
+- ⚙️ `scripts/instalar_odoo18_brasil.sh`: Script em shell que automatiza 100% o processo de preparação do servidor, instalação do Odoo, clone dos repositórios OCA, instalação dos pacotes Python e configuração do `odoo.conf`.
+- 💾 `scripts/backup_restore_odoo.sh`: Script utilitário para facilitar o backup e a restauração do banco de dados e do _filestore_ do seu ERP.
 
-## 🚀 Instalação Rápida (Script Automatizado)
+## 🚀 Como usar a Instalação Automatizada
 
-> **Pré-requisito:** Ubuntu 24.04 LTS limpo, logado como `root`.
+> **Aviso:** Execute o script em uma instalação limpa do Ubuntu 24.04.
 
+1. Faça o clone do repositório no seu servidor:
+   ```bash
+   git clone https://github.com/ssmvictor/odoo18-br-install.git
+   cd odoo18-br-install/scripts
+   ```
+
+2. Dê permissão de execução ao instalador:
+   ```bash
+   chmod +x instalar_odoo18_brasil.sh
+   ```
+
+3. Execute como `root` (ou com `sudo`). Você pode, opcionalmente, passar o nome que deseja para o banco de dados (o padrão é `odoo18br`):
+   ```bash
+   sudo ./instalar_odoo18_brasil.sh meu_banco_odoo
+   ```
+
+4. Acesse seu Odoo pelo navegador em `http://IP_DO_SERVIDOR:8069` e acompanhe a fase 3 do nosso [Guia Completo](./docs/Guia_Instalacao_Odoo18_LocalizacaoBR.md) para ativar os módulos.
+
+## 💾 Usando o Script de Backup / Restore
+
+O utilitário de backup pode ser executado para extrair rapidamente cópias do banco e dos anexos (filestore):
+
+**Para fazer Backup:**
 ```bash
-# 1. Baixar o script
-curl -O https://raw.githubusercontent.com/ssmvictor/odoo18-br-install/main/instalar_odoo18_brasil.sh
-
-# 2. Dar permissão de execução
-chmod +x instalar_odoo18_brasil.sh
-
-# 3. Executar (nome do banco é opcional, padrão: odoo18br)
-./instalar_odoo18_brasil.sh meu_banco
+sudo ./backup_restore_odoo.sh backup nome_do_banco
 ```
 
-O script instala e configura automaticamente:
-- ✅ Odoo 18 (Community)
-- ✅ Repositórios OCA: `l10n-brazil`, `account-financial-tools`, `product-attribute`, `server-ux`, `bank-payment`, `account-payment`
-- ✅ Dependências Python fiscais (`erpbrasil.*`, `signxml`, `cryptography`)
-- ✅ Configuração do `odoo.conf` com os `addons_path` corretos
-- ✅ Banco de dados com `l10n_br_base` instalado e sem dados de demonstração
-
----
-
-## 🔁 Backup e Restauração
-
+**Para Restaurar (Cuidado: substitui o banco atual):**
 ```bash
-chmod +x backup_restore_odoo.sh
-
-# Fazer backup
-./backup_restore_odoo.sh backup meu_banco
-
-# Listar backups
-./backup_restore_odoo.sh list
-
-# Restaurar
-./backup_restore_odoo.sh restore meu_banco /opt/odoo/backups/meu_banco_YYYYMMDD.sql.gz
+sudo ./backup_restore_odoo.sh restore nome_do_banco arquivo_filestore.tar.gz
 ```
 
----
+Consulte as outras opções (como `list`) executando o script sem argumentos.
 
-## 📋 Módulos OCA Brasileiros (Ordem de Instalação)
+## 🤝 Contribuições
 
-Após a instalação, acesse o Odoo via navegador (`http://seu_ip:8069`) e instale os módulos nesta sequência:
-
-1. `l10n_br_base` — Localização Base Brasil
-2. `l10n_br_fiscal` — Tabelas e Configurações Fiscais (ICMS, PIS, COFINS)
-3. `l10n_br_fiscal_certificate` — Gerenciamento de Certificado Digital A1
-4. `l10n_br_account` — Faturamento adaptado para o Brasil
-5. `l10n_br_fiscal_edi` — Documentos Fiscais Eletrônicos (NF-e)
-6. `l10n_br_fiscal_dfe` — Distribuição de DF-e
-7. `l10n_br_nfse` — Nota Fiscal de Serviço Eletrônica
-8. `l10n_br_nfse_focus` — Integração NFS-e via FocusNFe *(opcional)*
-
----
-
-## 📖 Guia Detalhado
-
-Para instalação manual ou configurações avançadas, consulte o [Guia Completo de Instalação](./Guia_Instalacao_Odoo18_LocalizacaoBR.md).
-
----
-
-## 🔧 Migração entre Servidores
-
-```
-SERVIDOR ANTIGO                        SERVIDOR NOVO
-┌──────────────────────┐               ┌──────────────────────┐
-│ 1. Fazer backup      │   scp/sftp    │ 3. Rodar instalação  │
-│    backup_restore.sh │ ────────────► │    instalar_odoo18   │
-│    backup            │               │    _brasil.sh        │
-│                      │               │                      │
-│ 2. Copiar .sql.gz    │               │ 4. Restaurar backup  │
-│    + filestore.tar   │               │    backup_restore.sh │
-│                      │               │    restore           │
-└──────────────────────┘               └──────────────────────┘
-```
-
----
-
-## 📄 Licença
-
-MIT
+Este repositório tem como base o ecossistema maduro mantido pela comunidade da [OCA (Odoo Community Association)](https://github.com/OCA/l10n-brazil). Sugestões, melhorias nos scripts e atualizações para contemplar novos módulos da versão 18.0 são bem-vindas através de _Pull Requests_ ou na aba _Issues_.
