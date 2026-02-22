@@ -85,9 +85,9 @@ sudo -u postgres createdb -O odoo nome_do_banco
 ```
 
 **3. Iniciar o Odoo forçando a instalação do módulo base brasileiro:**
-Isso injeta o banco do zero e força a instalar o "l10n_br_base" bloqueando os dados "demo/lixo":
+Isso injeta o banco do zero e força a instalar o "base_address_extended" e "l10n_br_base", bloqueando os dados "demo/lixo":
 ```bash
-sudo -u odoo odoo -c /etc/odoo/odoo.conf -d nome_do_banco --without-demo=all -i l10n_br_base --stop-after-init
+sudo -u odoo odoo -c /etc/odoo/odoo.conf -d nome_do_banco --without-demo=all -i base_address_extended,l10n_br_base --stop-after-init
 
 # Reinicie o serviço após concluir
 systemctl restart odoo
@@ -137,7 +137,7 @@ O último passo da jornada é configurar sua Empresa (`Configurações` > `Empre
 Estes scripts permitem replicar toda a instalação em qualquer servidor Ubuntu 24.04 limpo.
 
 ### Script 1: `instalar_odoo18_brasil.sh` — Instalação Completa do Zero
-Instala o Odoo 18, repositórios OCA, dependências Python, configura o `odoo.conf` e cria o banco de dados com `l10n_br_base`.
+Instala o Odoo 18, repositórios OCA, dependências Python, configura o `odoo.conf` e cria o banco de dados com `base_address_extended` e `l10n_br_base`.
 
 **Como usar em um servidor novo:**
 ```bash
