@@ -16,7 +16,7 @@
 #   3. Baixa todos os repositórios OCA necessários para localização BR
 #   4. Instala as dependências Python (incluindo signxml, cryptography)
 #   5. Configura o odoo.conf com os caminhos dos addons
-#   6. Cria um banco de dados limpo com l10n_br_base
+#   6. Cria um banco de dados limpo com base_address_extended e l10n_br_base
 #   7. Reinicia o Odoo pronto para uso
 # ==============================================================================
 
@@ -291,12 +291,12 @@ else
     log_ok "Banco '$DB_NAME' criado."
 fi
 
-# Inicializar o banco com l10n_br_base (sem dados demo)
-log_info "Inicializando banco com l10n_br_base (sem demo)... Isso pode demorar alguns minutos."
-sudo -u "$ODOO_USER" odoo -c "$ODOO_CONF" -d "$DB_NAME" --without-demo=all -i l10n_br_base --stop-after-init >> "$LOG_FILE" 2>&1
+# Inicializar o banco com l10n_br_base e base_address_extended (sem dados demo)
+log_info "Inicializando banco com base_address_extended e l10n_br_base (sem demo)... Isso pode demorar alguns minutos."
+sudo -u "$ODOO_USER" odoo -c "$ODOO_CONF" -d "$DB_NAME" --without-demo=all -i base_address_extended,l10n_br_base --stop-after-init >> "$LOG_FILE" 2>&1
 
 if [ $? -eq 0 ]; then
-    log_ok "Banco inicializado com l10n_br_base."
+    log_ok "Banco inicializado com sucesso (base_address_extended, l10n_br_base)."
 else
     log_warn "Houve avisos na inicialização do banco. Verifique o log: $LOG_FILE"
 fi
