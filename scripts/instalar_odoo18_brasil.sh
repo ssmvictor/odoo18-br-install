@@ -181,8 +181,17 @@ for repo in "${!OCA_REPOS[@]}"; do
         cd "$OCA_DIR"
     else
         log_info "Clonando $desc ($repo)..."
-        git clone -b "$ODOO_VERSION" "https://github.com/OCA/${repo}.git" >> "$LOG_FILE" 2>&1
-        log_ok "$repo clonado."
+        if git clone -b "$ODOO_VERSION" "https://github.com/OCA/${repo}.git" >> "$LOG_FILE" 2>&1; then
+            log_ok "$repo clonado."
+        else
+            log_fail "ERRO ao clonar $repo! Tentando novamente..."
+            sleep 5
+            git clone -b "$ODOO_VERSION" "https://github.com/OCA/${repo}.git" >> "$LOG_FILE" 2>&1 || {
+                log_fail "Falha definitiva ao clonar $repo. Verifique sua conexão."
+                exit 1
+            }
+            log_ok "$repo clonado na segunda tentativa."
+        fi
     fi
 done
 
@@ -190,11 +199,52 @@ done
 chown -R "$ODOO_USER:$ODOO_USER" "$OCA_DIR"/*
 log_ok "Permissões ajustadas para o usuário '$ODOO_USER'."
 
+# Verificar módulos críticos
+log_info "Verificando módulos críticos nos repositórios clonados..."
+
+CRITICAL_MODULES=(
+    "product-attribute/uom_alias"
+    "l10n-brazil/l10n_br_base"
+    "l10n-brazil/l10n_br_fiscal"
+    "l10n-brazil/l10n_br_account"
+    "server-ux/base_technical_user"
+)
+
+MISSING_MODULES=0
+for mod_path in "${CRITICAL_MODULES[@]}"; do
+    if [ -f "$OCA_DIR/$mod_path/__manifest__.py" ]; then
+        log_ok "Módulo encontrado: $mod_path"
+    else
+        log_fail "MÓDULO NÃO ENCONTRADO: $OCA_DIR/$mod_path/__manifest__.py"
+        MISSING_MODULES=$((MISSING_MODULES + 1))
+    fi
+done
+
+if [ "$MISSING_MODULES" -gt 0 ]; then
+    log_fail "$MISSING_MODULES módulo(s) crítico(s) ausente(s). Verifique se os repositórios foram clonados corretamente."
+    log_fail "Diretórios em $OCA_DIR:"
+    ls -la "$OCA_DIR" >> "$LOG_FILE" 2>&1
+    ls -la "$OCA_DIR" >&2
+    exit 1
+fi
+
+log_ok "Todos os módulos críticos verificados com sucesso."
+
 # ======================== FASE 4: Dependências Python ========================
 
 log_info "Fase 4: Instalando dependências Python..."
 
-# 4.1 - Requirements do l10n-brazil
+# 4.1 - Corrigir pacotes Debian que bloqueiam pip install
+# No Ubuntu 24.04, alguns pacotes Python foram instalados pelo Debian e não possuem
+# RECORD file, impedindo pip de desinstalá-los. Precisamos --ignore-installed para esses.
+log_info "Corrigindo pacotes do sistema que bloqueiam pip (typing-extensions, cryptography)..."
+python3 -m pip install --break-system-packages --ignore-installed \
+    typing-extensions \
+    cryptography \
+    >> "$LOG_FILE" 2>&1
+log_ok "Pacotes do sistema corrigidos."
+
+# 4.2 - Requirements do l10n-brazil
 cd "$OCA_DIR/l10n-brazil"
 if [ -f requirements.txt ]; then
     log_info "Instalando requirements.txt..."
@@ -204,34 +254,34 @@ else
     log_warn "requirements.txt não encontrado em $OCA_DIR/l10n-brazil"
 fi
 
-# 4.2 - Bibliotecas erpbrasil (sem dependências para evitar conflitos)
+# 4.3 - Bibliotecas erpbrasil
 log_info "Instalando bibliotecas erpbrasil..."
 python3 -m pip install \
+    erpbrasil.base \
     erpbrasil.assinatura \
     erpbrasil.transmissao \
     erpbrasil.edoc \
-    --no-deps --break-system-packages >> "$LOG_FILE" 2>&1
+    --break-system-packages >> "$LOG_FILE" 2>&1
 log_ok "Bibliotecas erpbrasil instaladas."
 
-# 4.3 - Dependências extras (signxml + cryptography atualizado)
-# No Ubuntu 24.04, o cryptography do sistema (Debian) bloqueia a desinstalação,
-# então usamos --ignore-installed para sobrescrever
-log_info "Instalando cryptography atualizado (--ignore-installed)..."
-python3 -m pip install cryptography --break-system-packages --ignore-installed >> "$LOG_FILE" 2>&1
-log_ok "cryptography atualizado."
-
+# 4.4 - signxml (requer cryptography >= 43, já instalado acima)
 log_info "Instalando signxml..."
 python3 -m pip install signxml --break-system-packages >> "$LOG_FILE" 2>&1
 log_ok "signxml instalado."
 
-# 4.4 - Outras dependências comuns que podem ser necessárias
-log_info "Instalando dependências complementares (lxml, pyOpenSSL, requests)..."
+# 4.5 - Todas as dependências externas dos módulos l10n-brazil
+# Extraídas dos __manifest__.py: l10n_br_base requer num2words, phonenumbers, email-validator
+# l10n_br_zip requer brazilcep; nfelib requer xsdata
+log_info "Instalando dependências complementares..."
 python3 -m pip install \
     lxml \
     pyOpenSSL \
     requests \
     num2words \
     phonenumbers \
+    email-validator \
+    brazilcep \
+    "nfelib>=2.0.0" \
     --break-system-packages >> "$LOG_FILE" 2>&1
 log_ok "Dependências complementares instaladas."
 
@@ -257,9 +307,9 @@ if [ -f "$ODOO_CONF" ]; then
         sed -i "s|^addons_path.*|$NEW_ADDONS_PATH|" "$ODOO_CONF"
         log_ok "addons_path atualizado no $ODOO_CONF."
     else
-        # Se não existir, adicionar
-        echo "$NEW_ADDONS_PATH" >> "$ODOO_CONF"
-        log_ok "addons_path adicionado ao $ODOO_CONF."
+        # Se não existir, inserir logo após [options] (mais robusto que append no final)
+        sed -i "/^\[options\]/a $NEW_ADDONS_PATH" "$ODOO_CONF"
+        log_ok "addons_path adicionado ao $ODOO_CONF (após [options])."
     fi
 else
     log_warn "$ODOO_CONF não encontrado. Criando arquivo de configuração..."
@@ -291,14 +341,29 @@ else
     log_ok "Banco '$DB_NAME' criado."
 fi
 
-# Inicializar o banco com l10n_br_base e base_address_extended (sem dados demo)
-log_info "Inicializando banco com base_address_extended e l10n_br_base (sem demo)... Isso pode demorar alguns minutos."
-sudo -u "$ODOO_USER" odoo -c "$ODOO_CONF" -d "$DB_NAME" --without-demo=all -i base_address_extended,l10n_br_base --stop-after-init >> "$LOG_FILE" 2>&1
+# Inicializar o banco com módulos base e dependências críticas (sem dados demo)
+# Incluímos uom_alias aqui para garantir que esteja registrado e instalado
+# antes de tentar instalar l10n_br_fiscal no painel
+log_info "Inicializando banco com módulos base (sem demo)... Isso pode demorar alguns minutos."
+sudo -u "$ODOO_USER" odoo -c "$ODOO_CONF" -d "$DB_NAME" --without-demo=all \
+    -i base_address_extended,l10n_br_base,uom_alias \
+    --stop-after-init >> "$LOG_FILE" 2>&1
 
 if [ $? -eq 0 ]; then
-    log_ok "Banco inicializado com sucesso (base_address_extended, l10n_br_base)."
+    log_ok "Banco inicializado com sucesso (base_address_extended, l10n_br_base, uom_alias)."
 else
     log_warn "Houve avisos na inicialização do banco. Verifique o log: $LOG_FILE"
+fi
+
+# Atualizar a lista de módulos disponíveis para que todos os OCA apareçam no painel
+log_info "Atualizando lista de módulos disponíveis no banco... Isso pode demorar."
+sudo -u "$ODOO_USER" odoo -c "$ODOO_CONF" -d "$DB_NAME" --without-demo=all \
+    -u base --stop-after-init >> "$LOG_FILE" 2>&1
+
+if [ $? -eq 0 ]; then
+    log_ok "Lista de módulos atualizada no banco."
+else
+    log_warn "Falha ao atualizar lista de módulos. Atualize manualmente no painel: Apps > Atualizar Lista de Aplicativos."
 fi
 
 # ======================== FASE 7: Iniciar Odoo ========================
